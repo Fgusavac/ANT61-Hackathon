@@ -199,6 +199,10 @@ input[type="tel"]:focus {
     z-index: 1000;
 }
 
+.notification.error {
+    background: #dc3545;
+}
+
 .notification.show {
     opacity: 1;
     transform: translateY(0);

@@ -18,7 +18,7 @@ class PeopleManager {
         e.preventDefault();
         
         const person = {
-            id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
             name: document.getElementById('name').value.trim(),
             email: document.getElementById('email').value.trim(),
             phone: document.getElementById('phone').value.trim(),
@@ -58,7 +58,13 @@ class PeopleManager {
     }
     
     savePeople() {
-        localStorage.setItem('people', JSON.stringify(this.people));
+        try {
+            localStorage.setItem('people', JSON.stringify(this.people));
+        } catch (error) {
+            console.error('Error saving people to localStorage:', error);
+            // Show error notification to user
+            this.showNotification('Error saving data. Storage may be full.', 'error');
+        }
     }
     
     renderPeople() {
@@ -106,9 +112,9 @@ class PeopleManager {
         return div.innerHTML;
     }
     
-    showNotification(message) {
+    showNotification(message, type = 'success') {
         const notification = document.createElement('div');
-        notification.className = 'notification';
+        notification.className = `notification ${type}`;
         notification.textContent = message;
         document.body.appendChild(notification);
         
