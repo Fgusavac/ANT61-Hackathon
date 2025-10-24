@@ -18,7 +18,7 @@ class PeopleManager {
         e.preventDefault();
         
         const person = {
-            id: Date.now().toString(),
+            id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             name: document.getElementById('name').value.trim(),
             email: document.getElementById('email').value.trim(),
             phone: document.getElementById('phone').value.trim(),
@@ -48,8 +48,13 @@ class PeopleManager {
     }
     
     loadPeople() {
-        const stored = localStorage.getItem('people');
-        return stored ? JSON.parse(stored) : [];
+        try {
+            const stored = localStorage.getItem('people');
+            return stored ? JSON.parse(stored) : [];
+        } catch (error) {
+            console.error('Error loading people from localStorage:', error);
+            return [];
+        }
     }
     
     savePeople() {
