@@ -126,3 +126,4 @@ temp/
 
 # Local Netlify folder
 .netlify
+node_modules/.vite/deps/_metadata.json
