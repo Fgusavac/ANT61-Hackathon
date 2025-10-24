@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Satellite } from "../types/Satellite";
+import type { Satellite } from "../types/Satellite";
 import { fetchConjunctionData, fetchCMEData } from "../utils/api";
 
 export const useSatelliteData = () => {
