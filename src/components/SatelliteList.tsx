@@ -1,4 +1,4 @@
-import { Satellite } from "../types/Satellite";
+import type { Satellite } from "../types/Satellite";
 
 interface Props {
   satellites: Satellite[];

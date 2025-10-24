@@ -5,4 +5,6 @@ export interface Satellite {
   inclination: number; // degrees
   velocity: number; // km/s
   status?: "safe" | "warning" | "danger";
+  tle?: string[]; // optional TLE lines
 }
+

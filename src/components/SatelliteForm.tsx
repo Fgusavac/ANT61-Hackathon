@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Satellite } from "../types/Satellite";
+import type { Satellite } from "../types/Satellite";
 
 interface Props {
   onAdd: (satellite: Satellite) => void;
