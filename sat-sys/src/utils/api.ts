@@ -6,6 +6,9 @@ const CELESTRAK_BASE = 'https://celestrak.org/NORAD/elements/gp.php';
 const NOAA_SWPC_BASE = 'https://services.swpc.noaa.gov/json';
 const SPACETRACK_BASE = 'https://www.space-track.org';
 
+// Get NASA API key from environment (Vite only - browser safe)
+const NASA_API_KEY = import.meta.env.VITE_NASA_API_KEY || 'DEMO_KEY';
+
 // ==================== TLE DATA ====================
 
 /**

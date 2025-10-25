@@ -68,6 +68,7 @@ export const useSatelliteData = () => {
         const newConjunctions: ConjunctionEvent[] = [];
 
         conjunctionData.forEach(c => {
+      
           // Only process conjunctions for satellites that are actually in our system
           const satelliteExists = satellites.some(sat => sat.id === c.satelliteId);
           if (!satelliteExists) {
@@ -76,11 +77,32 @@ export const useSatelliteData = () => {
 
           const timeUntil = new Date(c.tca).getTime() - Date.now();
           const hoursUntil = Math.round(timeUntil / (1000 * 60 * 60));
-          
-          // Add suggested action
+
+          // uniqueid generation
+          const uniqueId = `conj-${c.satelliteId}-${c.objectName}-${new Date(c.tca).getTime()}`;  // Unique based on sat ID, object, and TCA timestamp
+
+          if (dismissedAlerts.has(uniqueId)) {
+            return;
+          }
+
+          // Add suggested action and unique ID (NEW: based on stable properties to avoid index issues)
+
+          // uniqueid generation
+          const uniqueId = `conj-${c.satelliteId}-${c.objectName}-${new Date(c.tca).getTime()}`;  // Unique based on sat ID, object, and TCA timestamp
+
+          if (dismissedAlerts.has(uniqueId)) {
+            return;
+          }
+
+          // Add suggested action and unique ID (NEW: based on stable properties to avoid index issues)
           const suggestedAction = generateSuggestedAction(c);
-          const enhancedConjunction = { ...c, suggestedAction };
+          const enhancedConjunction = { ...c, id: uniqueId, suggestedAction };
           newConjunctions.push(enhancedConjunction);
+
+          // // Add suggested action
+          // const suggestedAction = generateSuggestedAction(c);
+          // const enhancedConjunction = { ...c, suggestedAction };
+          // newConjunctions.push(enhancedConjunction);
           
           if (c.risk === "high") {
             conjunctionAlerts.push(
@@ -96,58 +118,125 @@ export const useSatelliteData = () => {
         // Process CME alerts
         console.log('CME Event:', cmeEvent);
         const cmeAlerts: string[] = [];
+        const newSpaceWeatherAlerts: SpaceWeatherAlert[] = []; // Temporary array for new alerts
 
-        if (Array.isArray(cmeEvent)) {
-          const prediction = cmeEvent.find(p => p.predictedMethodName === 'Average of all Methods');
-          console.log('CME Prediction:', prediction);
-          console.log("Available Methods:", cmeEvent.map(p => p.predictedMethodName));
+        if (cmeEvents.length > 0) {
+          const recentCMEs = cmeEvents.slice(0, 3);
+          recentCMEs.forEach(cme => {
+            const analysis = cme.cmeAnalyses?.[0];
+            if (analysis && analysis.speed > 1000) {
 
-          if (prediction) {
-            const predictedArrival = new Date(prediction.predictedArrivalTime);
-            const submissionTime = new Date(prediction.submissionTime);
-            const leadTime = parseFloat(prediction.leadTimeInHrs);
+              // Skip if dismissed or already exists in current alerts
+              const id = `cme-${cme.activityID}`;
+              if (dismissedAlerts.has(id) || spaceWeatherAlerts.some(alert => alert.id === id)) {
+                return;
+              }
 
-            cmeAlerts.push(
-              `☀️ CME PREDICTION: ${prediction.predictedMethodName} predicts arrival on ${predictedArrival.toISOString()} with Kp range ${prediction.predictedMaxKpLowerRange}-${prediction.predictedMaxKpUpperRange}`
-            );
-
-            // Create space weather alert - only if we have satellites to affect
-            if (satellites.length > 0) {
-              const spaceWeatherAlert: SpaceWeatherAlert = {
-                id: `cme-${prediction.predictedMethodName}`, // Adjusted ID since cmeID is not present
-                type: 'cme',
-                severity: 'medium', // Adjust severity based on Kp range or other criteria
-                message: `CME predicted by ${prediction.predictedMethodName}: Arrival on ${predictedArrival.toISOString()} with Kp range ${prediction.predictedMaxKpLowerRange}-${prediction.predictedMaxKpUpperRange}`,
-                timestamp: submissionTime.toISOString(),
-                affectedSatellites: satellites.map(sat => sat.id), // Only affect existing satellites
-                suggestedAction: {
-                  id: `action-cme-${prediction.predictedMethodName}`,
-                  type: 'monitor',
-                  description: 'Monitor satellite systems for potential impact',
-                  priority: 'medium',
-                  estimatedTimeToExecute: 15,
-                  successProbability: 0.9
-                }
-              };
-              setSpaceWeatherAlerts(prev => [...prev, spaceWeatherAlert]);
-              console.log('Added Space Weather Alert for CME:', spaceWeatherAlert);
+              cmeAlerts.push(
+                `☀️ FAST CME DETECTED: ${analysis.speed} km/s from ${cme.sourceLocation || 'Sun'}`
+              );
+              
+              // Create space weather alert - only if we have satellites to affect
+              if (satellites.length > 0) {
+                const spaceWeatherAlert: SpaceWeatherAlert = {
+                  id: `cme-${cme.activityID}`,
+                  type: 'cme',
+                  severity: 'high',
+                  message: `High-speed CME detected: ${analysis.speed} km/s`,
+                  timestamp: cme.startTime,
+                  affectedSatellites: satellites.map(sat => sat.id), // Only affect existing satellites
+                  suggestedAction: {
+                    id: `action-cme-${cme.activityID}`,
+                    type: 'power_down',
+                    description: 'Consider powering down non-essential systems',
+                    priority: 'high',
+                    estimatedTimeToExecute: 30,
+                    successProbability: 0.95
+                  }
+                };
+                //setSpaceWeatherAlerts(prev => [...prev, spaceWeatherAlert]);
+                newSpaceWeatherAlerts.push(spaceWeatherAlert);
+              }
             }
           }
         }
 
-        // Process geomagnetic storm alerts
+        // Process geomagnetic storm alerts ---- still needs work
+        // Process geomagnetic storm alerts ---- still needs work
         const geomagneticAlerts: string[] = [];
+        const newGeomagAlerts: SpaceWeatherAlert[] = []; // Optional: for consistency, create dismissable geomagnetic alerts
+
+        const newGeomagAlerts: SpaceWeatherAlert[] = []; // Optional: for consistency, create dismissable geomagnetic alerts
+
         if (geomagneticData.length > 0) {
           const latestKp = geomagneticData[geomagneticData.length - 1];
           if (latestKp.kp_index > 5) {
+
+            
+            // Generate unique ID for geomagnetic (assuming latestKp has observedTime or similar field)
+            const geoId = `geomag-${new Date(latestKp.observedTime).getTime()}`; // Adjust field name if needed (e.g., latestKp.time_tag)
+            
+            // // Skip if dismissed or already exists
+            if (dismissedAlerts.has(geoId) || spaceWeatherAlerts.some(alert => alert.id === geoId)) {
+            } else {
+            
+
+            
+            // Generate unique ID for geomagnetic (assuming latestKp has observedTime or similar field)
+            const geoId = `geomag-${new Date(latestKp.observedTime).getTime()}`; // Adjust field name if needed (e.g., latestKp.time_tag)
+            
+            // // Skip if dismissed or already exists
+            if (dismissedAlerts.has(geoId) || spaceWeatherAlerts.some(alert => alert.id === geoId)) {
+            } else {
+            
             geomagneticAlerts.push(
               `🌪️ GEOMAGNETIC STORM: Kp index ${latestKp.kp_index} - Monitor satellite health`
             );
+            // Optional: Create a dismissable alert for geomagnetic
+              const geomagAlert: SpaceWeatherAlert = {
+                id: geoId,
+                type: 'geomagnetic',
+                severity: latestKp.kp_index > 7 ? 'critical' : 'high',
+                message: `Kp index ${latestKp.kp_index}`,
+                timestamp: latestKp.observedTime,
+                affectedSatellites: satellites.map(sat => sat.id),
+                suggestedAction: {
+                  id: `action-geomag-${geoId}`,
+                  type: 'monitor',
+                  description: 'Increase monitoring frequency',
+                  priority: 'medium',
+                  estimatedTimeToExecute: 0,
+                  successProbability: 1.0
+                }
+              };
+              newGeomagAlerts.push(geomagAlert);
+            }
+            // Optional: Create a dismissable alert for geomagnetic
+              const geomagAlert: SpaceWeatherAlert = {
+                id: geoId,
+                type: 'geomagnetic',
+                severity: latestKp.kp_index > 7 ? 'critical' : 'high',
+                message: `Kp index ${latestKp.kp_index}`,
+                timestamp: latestKp.observedTime,
+                affectedSatellites: satellites.map(sat => sat.id),
+                suggestedAction: {
+                  id: `action-geomag-${geoId}`,
+                  type: 'monitor',
+                  description: 'Increase monitoring frequency',
+                  priority: 'medium',
+                  estimatedTimeToExecute: 0,
+                  successProbability: 1.0
+                }
+              };
+              newGeomagAlerts.push(geomagAlert);
+            }
           }
         }
 
         // Update state
         setConjunctions(newConjunctions);
+        setSpaceWeatherAlerts(prev => [...prev, ...newSpaceWeatherAlerts, ...newGeomagAlerts]);
+        setSpaceWeatherAlerts(prev => [...prev, ...newSpaceWeatherAlerts, ...newGeomagAlerts]);
         setAlerts([...conjunctionAlerts, ...cmeAlerts, ...geomagneticAlerts]);
 
         // Update threat assessments
@@ -282,6 +371,24 @@ export const useSatelliteData = () => {
     return success;
   }, [simulators, satellites]);
 
+  // const dismissAlert = useCallback((alertId: string): void => {
+  //   console.log('Dismissing alert:', alertId);
+    
+  //   setDismissedAlerts(prev => new Set([...prev, alertId]));
+    
+  //   console.log('Alert dismissed successfully');
+  // }, []);
+
+  // const activeConjunctions = conjunctions.filter((_, index) => {
+  //   const alertId = `conjunction-${index}`;
+  //   return !dismissedAlerts.has(alertId);
+  // });
+
+  // const activeSpaceWeatherAlerts = spaceWeatherAlerts.filter((_, index) => {
+  //   const alertId = `space-weather-${index}`;
+  //   return !dismissedAlerts.has(alertId);
+  // });
+
   // Collision prediction between satellites
   const predictCollisions = useCallback(() => {
     const collisionPredictions: string[] = [];
@@ -312,8 +419,10 @@ export const useSatelliteData = () => {
     satellites, 
     setSatellites, 
     alerts, 
-    conjunctions,
+    conjunctions,       
     spaceWeatherAlerts,
+    dismissedAlerts,
+    setDismissedAlerts,
     threatAssessments,
     simulators,
     loading, 
@@ -323,6 +432,7 @@ export const useSatelliteData = () => {
     startSimulation,
     stopSimulation,
     executeAction,
+   // dismissAlert,
     predictCollisions
   };
 };

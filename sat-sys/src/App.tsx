@@ -3,6 +3,7 @@ import SatelliteForm from "./components/SatelliteForm";
 import SatelliteList from "./components/SatelliteList";
 import AlertPanel from "./components/AlertPanel";
 import SimulationControlPanel from "./components/SimulationControlPanel";
+import { Satellite, SuggestedAction } from "./types/Satellite";
 
 export default function App() {
   const { 
@@ -11,6 +12,8 @@ export default function App() {
     alerts, 
     conjunctions,
     spaceWeatherAlerts,
+    dismissedAlerts,
+    setDismissedAlerts,
     threatAssessments,
     loading, 
     isSimulationRunning,
@@ -18,10 +21,11 @@ export default function App() {
     startSimulation,
     stopSimulation,
     executeAction,
+    //dismissAlert,  // Changed from executeDismiss
     predictCollisions
   } = useSatelliteData();
 
-  const handleAddSatellite = (satellite: any) => {
+  const handleAddSatellite = (satellite: Satellite) => {
     setSatellites([...satellites, satellite]);
   };
 
@@ -29,14 +33,77 @@ export default function App() {
     setSatellites(satellites.filter(sat => sat.id !== id));
   };
 
-  const handleExecuteAction = (satelliteId: string, action: any) => {
+  const handleExecuteAction = (satelliteId: string, action: SuggestedAction) => {
+    console.log('🚀 Executing action for satellite:', satelliteId);
+    console.log('Action details:', action);
+    
+    // Find satellite for better messaging
+    const satellite = satellites.find(s => s.id === satelliteId);
+    const satelliteName = satellite?.name || satelliteId;
+    
+    // Execute the action via the hook
     const success = executeAction(satelliteId, action);
+    
     if (success) {
-      console.log(`Action executed successfully for satellite ${satelliteId}`);
+      console.log(`✅ Action executed successfully for ${satelliteName}`);
+      
+      // Mark the alert as dismissed through hook (consistent source of truth)
+      // const alertId = `conjunction-${satelliteId}-${action.id}`;
+      // dismissAlert(alertId);
+      
+      // Show success notification
+      alert(`✅ Action Executed Successfully!
+
+Satellite: ${satelliteName}
+Action Type: ${action.type.replace('_', ' ').toUpperCase()}
+Description: ${action.description}
+
+${action.parameters?.deltaV ? `ΔV Applied: ${action.parameters.deltaV} m/s\n` : ''}${action.parameters?.burnDuration ? `Burn Duration: ${action.parameters.burnDuration}s\n` : ''}${action.estimatedFuelCost ? `Fuel Used: ${action.estimatedFuelCost} kg\n` : ''}
+The satellite's orbit has been modified and the alert has been dismissed.`);
     } else {
-      console.error(`Failed to execute action for satellite ${satelliteId}`);
+      console.error(`❌ Failed to execute action for ${satelliteName}`);
+      
+      // Show error notification with helpful guidance
+      alert(`❌ Failed to Execute Action
+
+Satellite: ${satelliteName}
+
+Possible reasons:
+• Simulator not initialized yet
+• Simulation needs to be started first
+• Invalid action parameters
+
+Try starting the simulation and wait a few seconds before executing actions.`);
     }
   };
+
+  const handleDismissAlert = (alertId: string) => {
+    console.log("Dismissing alert:", alertId);
+    setDismissedAlerts(prev => new Set([...prev, alertId]));
+    console.log('Alert dismissed successfully');
+  };
+  
+  // Filter out dismissed alerts using unique IDs (NEW: no more index-based IDs)
+  const activeConjunctions = conjunctions.filter(c => !dismissedAlerts.has(c.id));
+  const activeSpaceWeatherAlerts = spaceWeatherAlerts.filter(alert => !dismissedAlerts.has(alert.id));  // Use built-in id
+  
+  // const handleDismissAlert = (alertId: string) => {
+  //   console.log("Dismissing alert:", alertId);
+  //   setDismissedAlerts(prev => new Set([...prev, alertId]));
+  //   console.log('Alert dismissed successfully');
+  //   //dismissAlert(alertId);
+  // };
+  
+  // // Filter out dismissed alerts
+  // const activeConjunctions = conjunctions.filter((_, index) => {
+  //   const alertId = `conjunction-${index}`;
+  //   return !dismissedAlerts.has(alertId);
+  // });
+
+  // const activeSpaceWeatherAlerts = spaceWeatherAlerts.filter((alert, index) => {
+  //   const alertId = `space-weather-${index}`;
+  //   return !dismissedAlerts.has(alertId);
+  // });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
@@ -77,9 +144,10 @@ export default function App() {
             />
             <AlertPanel 
               alerts={alerts}
-              conjunctions={conjunctions}
-              spaceWeatherAlerts={spaceWeatherAlerts}
+              conjunctions={activeConjunctions}
+              spaceWeatherAlerts={activeSpaceWeatherAlerts}
               onExecuteAction={handleExecuteAction}
+              onDismissAlert={handleDismissAlert}
             />
           </div>
         </div>
@@ -100,11 +168,11 @@ export default function App() {
               <div className="text-sm text-gray-300">Active Satellites</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-orange-400">{conjunctions.length}</div>
+              <div className="text-2xl font-bold text-orange-400">{activeConjunctions.length}</div>
               <div className="text-sm text-gray-300">Conjunction Events</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-red-400">{spaceWeatherAlerts.length}</div>
+              <div className="text-2xl font-bold text-red-400">{activeSpaceWeatherAlerts.length}</div>
               <div className="text-sm text-gray-300">Space Weather Alerts</div>
             </div>
             <div>

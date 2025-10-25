@@ -6,9 +6,10 @@ interface Props {
   conjunctions: ConjunctionEvent[];
   spaceWeatherAlerts: SpaceWeatherAlert[];
   onExecuteAction?: (satelliteId: string, action: SuggestedAction) => void;
+  onDismissAlert?: (alertId: string) => void;
 }
 
-export default function AlertPanel({ alerts, conjunctions, spaceWeatherAlerts, onExecuteAction }: Props) {
+export default function AlertPanel({ alerts, conjunctions, spaceWeatherAlerts, onExecuteAction, onDismissAlert }: Props) {
   const [expandedAlerts, setExpandedAlerts] = useState<Set<string>>(new Set());
 
   const toggleExpanded = (alertId: string) => {
@@ -74,6 +75,13 @@ export default function AlertPanel({ alerts, conjunctions, spaceWeatherAlerts, o
     }
   };
 
+  const handleDismiss = (alertId: string) => {
+    if (onDismissAlert) {
+      console.log("antohny cool");  
+      onDismissAlert(alertId);    
+    }
+  };
+
   return (
     <div className="p-6 border rounded-lg bg-gradient-to-br from-red-50 to-orange-50">
       <div className="flex justify-between items-center mb-4">
@@ -105,8 +113,8 @@ export default function AlertPanel({ alerts, conjunctions, spaceWeatherAlerts, o
           ))}
 
           {/* Conjunction Alerts */}
-          {conjunctions.map((conjunction, i) => {
-            const alertId = `conjunction-${i}`;
+          {conjunctions.map((conjunction) => {
+            const alertId = conjunction.id; 
             const isExpanded = expandedAlerts.has(alertId);
             const severity = conjunction.risk === 'high' ? 'critical' : conjunction.risk === 'medium' ? 'warning' : 'info';
             
@@ -207,7 +215,7 @@ export default function AlertPanel({ alerts, conjunctions, spaceWeatherAlerts, o
                             Execute Action
                           </button>
                           <button
-                            onClick={() => {/* TODO: Implement dismiss */}}
+                            onClick={() => handleDismiss(alertId)}
                             className="px-3 py-1 rounded text-sm font-medium bg-gray-600 text-white hover:bg-gray-700"
                           >
                             Dismiss
@@ -222,8 +230,8 @@ export default function AlertPanel({ alerts, conjunctions, spaceWeatherAlerts, o
           })}
 
           {/* Space Weather Alerts */}
-          {spaceWeatherAlerts.map((alert, i) => {
-            const alertId = `space-weather-${i}`;
+          {spaceWeatherAlerts.map((alert) => {
+            const alertId = alert.id;
             const isExpanded = expandedAlerts.has(alertId);
             const severity = alert.severity === 'critical' ? 'critical' : alert.severity === 'high' ? 'warning' : 'info';
             
@@ -292,7 +300,11 @@ export default function AlertPanel({ alerts, conjunctions, spaceWeatherAlerts, o
                         
                         <div className="mt-3 flex space-x-2">
                           <button
-                            onClick={() => {/* TODO: Implement space weather action execution */}}
+                            onClick={() => {
+                              if (alert.affectedSatellites && alert.affectedSatellites.length > 0) {
+                                handleExecuteAction(alert.affectedSatellites[0], alert.suggestedAction!);
+                              }
+                            }}
                             className={`px-3 py-1 rounded text-sm font-medium ${
                               alert.suggestedAction.priority === 'critical' 
                                 ? 'bg-red-600 text-white hover:bg-red-700' 
@@ -304,7 +316,7 @@ export default function AlertPanel({ alerts, conjunctions, spaceWeatherAlerts, o
                             Execute Action
                           </button>
                           <button
-                            onClick={() => {/* TODO: Implement dismiss */}}
+                            onClick={() => handleDismiss(alertId)}
                             className="px-3 py-1 rounded text-sm font-medium bg-gray-600 text-white hover:bg-gray-700"
                           >
                             Dismiss
@@ -326,3 +338,4 @@ export default function AlertPanel({ alerts, conjunctions, spaceWeatherAlerts, o
     </div>
   );
 }
+

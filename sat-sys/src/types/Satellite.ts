@@ -37,6 +37,7 @@ export interface Satellite {
 }
 
 export interface ConjunctionEvent {
+  id: string;
   satelliteId: string;
   objectName: string;
   tca: string; // Time of Closest Approach
