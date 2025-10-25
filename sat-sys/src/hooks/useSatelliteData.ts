@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Satellite, ConjunctionEvent, SpaceWeatherAlert, ThreatAssessment, SuggestedAction } from "../types/Satellite";
-import { fetchConjunctionData, fetchCMEData, fetchGeomagneticStorm, fetchSpaceWeatherAlerts, generateSuggestedAction } from "../utils/api";
+import { fetchConjunctionData, fetchLatestCMEPrediction, fetchGeomagneticStorm, fetchSpaceWeatherAlerts, generateSuggestedAction } from "../utils/api";
 import { createSatelliteSimulator, OrbitUtils } from "../utils/SatelliteSimulator";
 
 export const useSatelliteData = () => {
@@ -43,16 +43,17 @@ export const useSatelliteData = () => {
         // Use Promise.allSettled to handle individual API failures gracefully
         const [conjunctionResult, cmeResult, geomagneticResult, weatherResult] = await Promise.allSettled([
           fetchConjunctionData(),
-          fetchCMEData(),
+          fetchLatestCMEPrediction(),
           fetchGeomagneticStorm(),
           fetchSpaceWeatherAlerts()
         ]);
+        console.log('CME Result:', cmeResult);
 
         // Extract data from successful promises, use fallback for failed ones
-        const conjunctionData = conjunctionResult.status === 'fulfilled' ? conjunctionResult.value : [];
-        const cmeEvents = cmeResult.status === 'fulfilled' ? cmeResult.value : [];
-        const geomagneticData = geomagneticResult.status === 'fulfilled' ? geomagneticResult.value : [];
-        const weatherAlerts = weatherResult.status === 'fulfilled' ? weatherResult.value : [];
+        const conjunctionData = conjunctionResult.status === 'fulfilled' && Array.isArray(conjunctionResult.value) ? conjunctionResult.value : [];
+        const cmeEvent = cmeResult.status === 'fulfilled' && Array.isArray(cmeResult.value) ? cmeResult.value : [];        
+        const geomagneticData = geomagneticResult.status === 'fulfilled' && Array.isArray(geomagneticResult.value) ? geomagneticResult.value : [];
+        const weatherAlerts = weatherResult.status === 'fulfilled' && Array.isArray(weatherResult.value) ? weatherResult.value : [];
 
         // Check if we're in offline mode (all APIs failed)
         const allFailed = conjunctionResult.status === 'rejected' && 
@@ -93,38 +94,45 @@ export const useSatelliteData = () => {
         });
 
         // Process CME alerts
+        console.log('CME Event:', cmeEvent);
         const cmeAlerts: string[] = [];
-        if (cmeEvents.length > 0) {
-          const recentCMEs = cmeEvents.slice(0, 3);
-          recentCMEs.forEach(cme => {
-            const analysis = cme.cmeAnalyses?.[0];
-            if (analysis && analysis.speed > 1000) {
-              cmeAlerts.push(
-                `☀️ FAST CME DETECTED: ${analysis.speed} km/s from ${cme.sourceLocation || 'Sun'}`
-              );
-              
-              // Create space weather alert - only if we have satellites to affect
-              if (satellites.length > 0) {
-                const spaceWeatherAlert: SpaceWeatherAlert = {
-                  id: `cme-${cme.activityID}`,
-                  type: 'cme',
-                  severity: 'high',
-                  message: `High-speed CME detected: ${analysis.speed} km/s`,
-                  timestamp: cme.startTime,
-                  affectedSatellites: satellites.map(sat => sat.id), // Only affect existing satellites
-                  suggestedAction: {
-                    id: `action-cme-${cme.activityID}`,
-                    type: 'power_down',
-                    description: 'Consider powering down non-essential systems',
-                    priority: 'high',
-                    estimatedTimeToExecute: 30,
-                    successProbability: 0.95
-                  }
-                };
-                setSpaceWeatherAlerts(prev => [...prev, spaceWeatherAlert]);
-              }
+
+        if (Array.isArray(cmeEvent)) {
+          const prediction = cmeEvent.find(p => p.predictedMethodName === 'Average of all Methods');
+          console.log('CME Prediction:', prediction);
+          console.log("Available Methods:", cmeEvent.map(p => p.predictedMethodName));
+
+          if (prediction) {
+            const predictedArrival = new Date(prediction.predictedArrivalTime);
+            const submissionTime = new Date(prediction.submissionTime);
+            const leadTime = parseFloat(prediction.leadTimeInHrs);
+
+            cmeAlerts.push(
+              `☀️ CME PREDICTION: ${prediction.predictedMethodName} predicts arrival on ${predictedArrival.toISOString()} with Kp range ${prediction.predictedMaxKpLowerRange}-${prediction.predictedMaxKpUpperRange}`
+            );
+
+            // Create space weather alert - only if we have satellites to affect
+            if (satellites.length > 0) {
+              const spaceWeatherAlert: SpaceWeatherAlert = {
+                id: `cme-${prediction.predictedMethodName}`, // Adjusted ID since cmeID is not present
+                type: 'cme',
+                severity: 'medium', // Adjust severity based on Kp range or other criteria
+                message: `CME predicted by ${prediction.predictedMethodName}: Arrival on ${predictedArrival.toISOString()} with Kp range ${prediction.predictedMaxKpLowerRange}-${prediction.predictedMaxKpUpperRange}`,
+                timestamp: submissionTime.toISOString(),
+                affectedSatellites: satellites.map(sat => sat.id), // Only affect existing satellites
+                suggestedAction: {
+                  id: `action-cme-${prediction.predictedMethodName}`,
+                  type: 'monitor',
+                  description: 'Monitor satellite systems for potential impact',
+                  priority: 'medium',
+                  estimatedTimeToExecute: 15,
+                  successProbability: 0.9
+                }
+              };
+              setSpaceWeatherAlerts(prev => [...prev, spaceWeatherAlert]);
+              console.log('Added Space Weather Alert for CME:', spaceWeatherAlert);
             }
-          });
+          }
         }
 
         // Process geomagnetic storm alerts

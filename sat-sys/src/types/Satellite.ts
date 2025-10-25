@@ -47,18 +47,20 @@ export interface ConjunctionEvent {
   suggestedAction?: SuggestedAction;
 }
 
-export interface CMEEvent {
-  activityID: string;
-  startTime: string;
-  sourceLocation?: string;
-  note?: string;
-  instruments: Array<{ displayName: string }>;
-  cmeAnalyses: Array<{
-    speed: number;
-    latitude: number;
-    longitude: number;
-    time21_5: string;
-  }>;
+export interface CMEPrediction {
+  predictedMethodName: string;
+  submissionTime: string;
+  predictedArrivalTime: string;
+  uncertaintyMinusInHrs?: number | null;
+  uncertaintyPlusInHrs?: number | null;
+  confidenceInPercentage?: number | null;
+  predictedMaxKpLowerRange?: number | null;
+  predictedMaxKpUpperRange?: number | null;
+  predictedDstMin?: number | null;
+  predictedDstMinTime?: string | null;
+  differenceInHrs?: number | null;
+  leadTimeInHrs?: string | null;
+  predictionNote?: string;
 }
 
 export interface SpaceWeatherAlert {

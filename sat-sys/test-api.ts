@@ -3,10 +3,12 @@
  * Run with: npx tsx test-api.ts
  */
 
+import fs from 'fs/promises';
+
 import { 
   fetchTLEFromCelesTrak, 
   fetchTLEByNoradId, 
-  fetchCMEData, 
+  fetchLatestCMEPrediction, 
   fetchGeomagneticStorm,
   fetchSpaceWeatherAlerts,
   fetchConjunctionData,
@@ -29,16 +31,25 @@ async function testAPIs() {
     console.log(`✅ ISS loaded: ${iss.name}`);
     console.log(`   TLE Line 1: ${iss.line1.substring(0, 50)}...`);
 
-    // Test CME data
-    console.log('\n☀️ Testing NASA DONKI CME Data...');
-    const cmes = await fetchCMEData();
-    console.log(`✅ Loaded ${cmes.length} CME events`);
-    if (cmes.length > 0) {
-      const latestCME = cmes[0];
-      console.log(`   Latest CME: ${latestCME.activityID}`);
-      if (latestCME.cmeAnalyses?.[0]) {
-        console.log(`   Speed: ${latestCME.cmeAnalyses[0].speed} km/s`);
-      }
+    // Test CME prediction data
+    console.log('\n☀️ Testing CME Prediction Data...');
+    const predictions = await fetchLatestCMEPrediction();
+
+    if (predictions) {
+      console.log(`✅ Found CME Prediction:`);
+      console.log(`   ID: ${predictions.id}`);
+      console.log(`   Predicted Arrival Time: ${predictions.predictedArrivalTime}`);
+      console.log(`   CME Time: ${predictions.cmeTime}`);
+      console.log(`   Probability: ${predictions.probability}%`);
+      console.log(`   Source Location: ${predictions.sourceLocation || 'N/A'}`);
+      console.log(`   Instruments: ${predictions.instruments.map(i => i.displayName).join(', ')}`);
+
+      // Write the prediction to a new file
+      const fileName = 'latest-cme-prediction.json';
+      await fs.writeFile(fileName, JSON.stringify(predictions, null, 2));
+      console.log(`📁 CME Prediction written to ${fileName}`);
+    } else {
+      console.log('❌ No valid CME predictions found.');
     }
 
     // Test geomagnetic storm data
