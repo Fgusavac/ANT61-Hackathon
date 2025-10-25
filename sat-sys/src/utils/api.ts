@@ -241,7 +241,7 @@ export async function fetchSolarWind() {
 export async function fetchSpaceWeatherAlerts() {
   try {
     const response = await axios.get(
-      `${NOAA_SWPC_BASE}/alerts.json`,
+      `${NOAA_SWPC_BASE}/icao-space-weather-advisories.json`,
       {
         timeout: 10000,
         headers: {
@@ -264,7 +264,7 @@ export async function fetchSpaceWeatherAlerts() {
   }
 }
 
-// ==================== CONJUNCTION DATA ====================
+//==================== CONJUNCTION DATA ====================
 
 export interface ConjunctionEvent {
   satelliteId: string;

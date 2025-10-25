@@ -50,6 +50,8 @@ export const useSatelliteData = () => {
         ]);
         console.log('CME Result:', cmeResult);
 
+
+
         // Extract data from successful promises, use fallback for failed ones
         const conjunctionData = conjunctionResult.status === 'fulfilled' && Array.isArray(conjunctionResult.value) ? conjunctionResult.value : [];
         const cmeEvent = cmeResult.status === 'fulfilled' && Array.isArray(cmeResult.value) ? cmeResult.value : [];        
@@ -109,37 +111,42 @@ export const useSatelliteData = () => {
         const cmeAlerts: string[] = [];
         const newSpaceWeatherAlerts: SpaceWeatherAlert[] = []; // Temporary array for new alerts
         
-        if (cmeEvents.length > 0) {
-          const recentCMEs = cmeEvents.slice(0, 3);
-          recentCMEs.forEach(cme => {
-            const analysis = cme.cmeAnalyses?.[0];
-            if (analysis && analysis.speed > 1000) {
-              cmeAlerts.push(
-                `☀️ FAST CME DETECTED: ${analysis.speed} km/s from ${cme.sourceLocation || 'Sun'}`
-              );
+       if (Array.isArray(cmeEvent)) {
+          const prediction = cmeEvent.find(p => p.predictedMethodName === 'Average of all Methods');
+          console.log('CME Prediction:', prediction);
+          console.log("Available Methods:", cmeEvent.map(p => p.predictedMethodName));
+
+          if (prediction) {
+            const predictedArrival = new Date(prediction.predictedArrivalTime);
+            const submissionTime = new Date(prediction.submissionTime);
+            const leadTime = parseFloat(prediction.leadTimeInHrs);
+
+            cmeAlerts.push(
+            `☀️ CME PREDICTION: ${prediction.predictedMethodName} predicts arrival on ${predictedArrival.toISOString()} with Kp range ${prediction.predictedMaxKpLowerRange}-${prediction.predictedMaxKpUpperRange}`
+            );
+
               
               // Create space weather alert - only if we have satellites to affect
               if (satellites.length > 0) {
                 const spaceWeatherAlert: SpaceWeatherAlert = {
-                  id: `cme-${cme.activityID}`,
+                  id: `cme-${prediction.predictedMethodName}`, // Adjusted ID since cmeID is not present
                   type: 'cme',
-                  severity: 'high',
-                  message: `High-speed CME detected: ${analysis.speed} km/s`,
-                  timestamp: cme.startTime,
+                  severity: 'medium', // Adjust severity based on Kp range or other criteria
+                  message: `CME predicted by ${prediction.predictedMethodName}: Arrival on ${predictedArrival.toISOString()} with Kp range ${prediction.predictedMaxKpLowerRange}-${prediction.predictedMaxKpUpperRange}`,
+                  timestamp: submissionTime.toISOString(),
                   affectedSatellites: satellites.map(sat => sat.id), // Only affect existing satellites
                   suggestedAction: {
-                    id: `action-cme-${cme.activityID}`,
-                    type: 'power_down',
-                    description: 'Consider powering down non-essential systems',
-                    priority: 'high',
-                    estimatedTimeToExecute: 30,
-                    successProbability: 0.95
+                    id: `action-cme-${prediction.predictedMethodName}`,
+                  type: 'monitor',
+                  description: 'Monitor satellite systems for potential impact',
+                  priority: 'medium',
+                  estimatedTimeToExecute: 15,
+                  successProbability: 0.9
                   }
                 };
                 newSpaceWeatherAlerts.push(spaceWeatherAlert);
-              }
             }
-          });
+          }
         }
 
         // Process geomagnetic storm alerts ---- still needs work
