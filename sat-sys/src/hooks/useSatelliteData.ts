@@ -8,6 +8,7 @@ export const useSatelliteData = () => {
   const [alerts, setAlerts] = useState<string[]>([]);
   const [conjunctions, setConjunctions] = useState<ConjunctionEvent[]>([]);
   const [spaceWeatherAlerts, setSpaceWeatherAlerts] = useState<SpaceWeatherAlert[]>([]);
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set()); // Track dismissed alerts
   const [threatAssessments, setThreatAssessments] = useState<Map<string, ThreatAssessment>>(new Map());
   const [simulators, setSimulators] = useState<Map<string, any>>(new Map());
   const [loading, setLoading] = useState(false);
@@ -81,15 +82,7 @@ export const useSatelliteData = () => {
           // uniqueid generation
           const uniqueId = `conj-${c.satelliteId}-${c.objectName}-${new Date(c.tca).getTime()}`;  // Unique based on sat ID, object, and TCA timestamp
 
-          if (dismissedAlerts.has(uniqueId)) {
-            return;
-          }
-
-          // Add suggested action and unique ID (NEW: based on stable properties to avoid index issues)
-
-          // uniqueid generation
-          const uniqueId = `conj-${c.satelliteId}-${c.objectName}-${new Date(c.tca).getTime()}`;  // Unique based on sat ID, object, and TCA timestamp
-
+          // Check if dismissed
           if (dismissedAlerts.has(uniqueId)) {
             return;
           }
@@ -98,11 +91,6 @@ export const useSatelliteData = () => {
           const suggestedAction = generateSuggestedAction(c);
           const enhancedConjunction = { ...c, id: uniqueId, suggestedAction };
           newConjunctions.push(enhancedConjunction);
-
-          // // Add suggested action
-          // const suggestedAction = generateSuggestedAction(c);
-          // const enhancedConjunction = { ...c, suggestedAction };
-          // newConjunctions.push(enhancedConjunction);
           
           if (c.risk === "high") {
             conjunctionAlerts.push(
@@ -117,21 +105,15 @@ export const useSatelliteData = () => {
 
         // Process CME alerts
         console.log('CME Event:', cmeEvent);
+
         const cmeAlerts: string[] = [];
         const newSpaceWeatherAlerts: SpaceWeatherAlert[] = []; // Temporary array for new alerts
-
+        
         if (cmeEvents.length > 0) {
           const recentCMEs = cmeEvents.slice(0, 3);
           recentCMEs.forEach(cme => {
             const analysis = cme.cmeAnalyses?.[0];
             if (analysis && analysis.speed > 1000) {
-
-              // Skip if dismissed or already exists in current alerts
-              const id = `cme-${cme.activityID}`;
-              if (dismissedAlerts.has(id) || spaceWeatherAlerts.some(alert => alert.id === id)) {
-                return;
-              }
-
               cmeAlerts.push(
                 `☀️ FAST CME DETECTED: ${analysis.speed} km/s from ${cme.sourceLocation || 'Sun'}`
               );
@@ -154,18 +136,14 @@ export const useSatelliteData = () => {
                     successProbability: 0.95
                   }
                 };
-                //setSpaceWeatherAlerts(prev => [...prev, spaceWeatherAlert]);
                 newSpaceWeatherAlerts.push(spaceWeatherAlert);
               }
             }
-          }
+          });
         }
 
         // Process geomagnetic storm alerts ---- still needs work
-        // Process geomagnetic storm alerts ---- still needs work
         const geomagneticAlerts: string[] = [];
-        const newGeomagAlerts: SpaceWeatherAlert[] = []; // Optional: for consistency, create dismissable geomagnetic alerts
-
         const newGeomagAlerts: SpaceWeatherAlert[] = []; // Optional: for consistency, create dismissable geomagnetic alerts
 
         if (geomagneticData.length > 0) {
@@ -174,16 +152,7 @@ export const useSatelliteData = () => {
 
             
             // Generate unique ID for geomagnetic (assuming latestKp has observedTime or similar field)
-            const geoId = `geomag-${new Date(latestKp.observedTime).getTime()}`; // Adjust field name if needed (e.g., latestKp.time_tag)
-            
-            // // Skip if dismissed or already exists
-            if (dismissedAlerts.has(geoId) || spaceWeatherAlerts.some(alert => alert.id === geoId)) {
-            } else {
-            
-
-            
-            // Generate unique ID for geomagnetic (assuming latestKp has observedTime or similar field)
-            const geoId = `geomag-${new Date(latestKp.observedTime).getTime()}`; // Adjust field name if needed (e.g., latestKp.time_tag)
+            const geoId = `geomag-${new Date(latestKp.time_tag).getTime()}`; // Adjust field name if needed (e.g., latestKp.time_tag)
             
             // // Skip if dismissed or already exists
             if (dismissedAlerts.has(geoId) || spaceWeatherAlerts.some(alert => alert.id === geoId)) {
@@ -198,26 +167,7 @@ export const useSatelliteData = () => {
                 type: 'geomagnetic',
                 severity: latestKp.kp_index > 7 ? 'critical' : 'high',
                 message: `Kp index ${latestKp.kp_index}`,
-                timestamp: latestKp.observedTime,
-                affectedSatellites: satellites.map(sat => sat.id),
-                suggestedAction: {
-                  id: `action-geomag-${geoId}`,
-                  type: 'monitor',
-                  description: 'Increase monitoring frequency',
-                  priority: 'medium',
-                  estimatedTimeToExecute: 0,
-                  successProbability: 1.0
-                }
-              };
-              newGeomagAlerts.push(geomagAlert);
-            }
-            // Optional: Create a dismissable alert for geomagnetic
-              const geomagAlert: SpaceWeatherAlert = {
-                id: geoId,
-                type: 'geomagnetic',
-                severity: latestKp.kp_index > 7 ? 'critical' : 'high',
-                message: `Kp index ${latestKp.kp_index}`,
-                timestamp: latestKp.observedTime,
+                timestamp: latestKp.time_tag,
                 affectedSatellites: satellites.map(sat => sat.id),
                 suggestedAction: {
                   id: `action-geomag-${geoId}`,
@@ -235,7 +185,6 @@ export const useSatelliteData = () => {
 
         // Update state
         setConjunctions(newConjunctions);
-        setSpaceWeatherAlerts(prev => [...prev, ...newSpaceWeatherAlerts, ...newGeomagAlerts]);
         setSpaceWeatherAlerts(prev => [...prev, ...newSpaceWeatherAlerts, ...newGeomagAlerts]);
         setAlerts([...conjunctionAlerts, ...cmeAlerts, ...geomagneticAlerts]);
 

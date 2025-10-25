@@ -16,34 +16,66 @@ const NASA_API_KEY = import.meta.env.VITE_NASA_API_KEY || 'DEMO_KEY';
  * @param group - Satellite group (e.g., 'stations', 'visual', 'active')
  * @returns Array of TLE strings (3 lines per satellite: name, line1, line2)
  */
-export async function fetchTLEFromCelesTrak(group: string = 'stations') {
-  try {
-    const response = await axios.get(CELESTRAK_BASE, {
-      params: {
-        GROUP: group,
-        FORMAT: 'tle'
-      }
-    });
+// export async function fetchTLEFromCelesTrak(group: string = 'stations') {
+//   try {
+//     const response = await axios.get(CELESTRAK_BASE, {
+//       params: {
+//         GROUP: group,
+//         FORMAT: 'tle'
+//       }
+//     });
     
-    // Parse TLE data (3 lines per satellite)
-    const lines = response.data.split('\n').filter((line: string) => line.trim());
-    const satellites = [];
+//     // Parse TLE data (3 lines per satellite)
+//     const lines = response.data.split('\n').filter((line: string) => line.trim());
+//     const satellites = [];
     
-    for (let i = 0; i < lines.length; i += 3) {
-      if (i + 2 < lines.length) {
-        satellites.push({
-          name: lines[i].trim(),
-          line1: lines[i + 1].trim(),
-          line2: lines[i + 2].trim()
-        });
-      }
+//     for (let i = 0; i < lines.length; i += 3) {
+//       if (i + 2 < lines.length) {
+//         satellites.push({
+//           name: lines[i].trim(),
+//           line1: lines[i + 1].trim(),
+//           line2: lines[i + 2].trim()
+//         });
+//       }
+//     }
+    
+//     return satellites;
+//   } catch (error) {
+//     console.error('Error fetching TLE from CelesTrak:', error);
+//     throw error;
+//   }
+// }
+
+export async function fetchTLEFromCelesTrak() {
+   // Mock data matching the structure expected in useSatelliteData.ts (with activityID, startTime, sourceLocation, cmeAnalyses)
+  const mockCME = [
+    {
+      activityID: '2025-001-001',
+      startTime: '2025-10-24T12:00:00Z', // Fixed start time
+      sourceLocation: 'Sun Center',
+      instruments: [{ displayName: 'SOHO' }],
+      cmeAnalyses: [{
+        speed: 1200,
+        latitude: 10,
+        longitude: -20,
+        time21_5: '2025-10-25T00:00:00Z'
+      }]
+    },
+    {
+      activityID: '2025-001-002',
+      startTime: '2025-10-23T18:00:00Z', // Fixed start time
+      sourceLocation: 'Sun East',
+      instruments: [{ displayName: 'STEREO' }],
+      cmeAnalyses: [{
+        speed: 1500,
+        latitude: 5,
+        longitude: 15,
+        time21_5: '2025-10-24T06:00:00Z'
+      }]
     }
-    
-    return satellites;
-  } catch (error) {
-    console.error('Error fetching TLE from CelesTrak:', error);
-    throw error;
-  }
+  ];
+  
+  return mockCME;
 }
 
 /**
@@ -138,29 +170,53 @@ export interface GeomageticStorm {
  * Fetch current Geomagnetic Storm data from NOAA
  */
 export async function fetchGeomagneticStorm() {
-  try {
-    const response = await axios.get<GeomageticStorm[]>(
-      `${NOAA_SWPC_BASE}/planetary_k_index_1m.json`,
-      {
-        timeout: 10000,
-        headers: {
-          'Accept': 'application/json',
-        }
-      }
-    );
+  // uncomment to test with api
+  // try {
+  //   const response = await axios.get<GeomageticStorm[]>(
+  //     `${NOAA_SWPC_BASE}/planetary_k_index_1m.json`,
+  //     {
+  //       timeout: 10000,
+  //       headers: {
+  //         'Accept': 'application/json',
+  //       }
+  //     }
+  //   );
     
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching geomagnetic storm data:', error);
-    // Return empty array for network errors
-    if (axios.isAxiosError(error)) {
-      if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
-        console.warn('Geomagnetic storm API network error - returning empty data');
-        return [];
-      }
+  //   return response.data;
+  // } catch (error) {
+  //   console.error('Error fetching geomagnetic storm data:', error);
+  //   // Return empty array for network errors
+  //   if (axios.isAxiosError(error)) {
+  //     if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
+  //       console.warn('Geomagnetic storm API network error - returning empty data');
+  //       return [];
+  //     }
+  //   }
+  //   throw error;
+  // }
+
+//mock data to test 
+const mockGeomag: GeomageticStorm[] = [
+    {
+      time_tag: '2025-10-25T12:00:00Z', // Fixed time tag
+      kp_index: 4,
+      observed: 'observed',
+      noaa_scale: 'G0'
+    },
+    {
+      time_tag: '2025-10-25T12:05:00Z', // Fixed time tag
+      kp_index: 6,
+      observed: 'observed',
+      noaa_scale: 'G2'
+    },
+    {
+      time_tag: '2025-10-25T12:10:00Z', // Fixed time tag
+      kp_index: 7.5,
+      observed: 'observed',
+      noaa_scale: 'G3'
     }
-    throw error;
-  }
+  ];
+  return mockGeomag;
 }
 
 /**
