@@ -1,13 +1,10 @@
 import axios from 'axios';
 
 // API Configuration
-const NASA_DONKI_BASE = 'https://api.nasa.gov/DONKI';
+const CME_PREDICTION_API = 'https://kauai.ccmc.gsfc.nasa.gov/CMEscoreboard/WS/get/predictions';;
 const CELESTRAK_BASE = 'https://celestrak.org/NORAD/elements/gp.php';
 const NOAA_SWPC_BASE = 'https://services.swpc.noaa.gov/json';
 const SPACETRACK_BASE = 'https://www.space-track.org';
-
-// Get NASA API key from environment (Vite only - browser safe)
-const NASA_API_KEY = import.meta.env.VITE_NASA_API_KEY || 'DEMO_KEY';
 
 // ==================== TLE DATA ====================
 
@@ -77,88 +74,53 @@ export async function fetchTLEByNoradId(noradId: string) {
 
 // ==================== CME DATA ====================
 
-export interface CMEEvent {
-  activityID: string;
-  startTime: string;
-  sourceLocation?: string;
-  note?: string;
-  instruments: Array<{ displayName: string }>;
-  cmeAnalyses: Array<{
-    speed: number;
-    latitude: number;
-    longitude: number;
-    time21_5: string;
-  }>;
+export interface CMEPrediction {
+  id: string;
+  cmeTime: string; // Time of the CME event
+  predictedArrivalTime: string; // Predicted arrival time at Earth
+  probability: number; // Probability of arrival (if provided)
+  sourceLocation?: string; // Optional source location of the CME
+  instruments: Array<{ displayName: string }>; // Instruments used for prediction
+  notes?: string; // Optional notes or comments
 }
-
 /**
- * Fetch CME (Coronal Mass Ejection) events from NASA DONKI
- * @param startDate - Start date (YYYY-MM-DD)
- * @param endDate - End date (YYYY-MM-DD)
+ * Fetch the latest CME prediction from NASA CME Scoreboard API
  */
-export async function fetchCMEData(startDate?: string, endDate?: string) {
+export async function fetchLatestCMEPrediction() {
+  const currentDate = new Date().toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
+  const fiveDaysPrior = new Date();
+  fiveDaysPrior.setDate(fiveDaysPrior.getDate() - 5); // Subtract 5 days from the current date
+  const fiveDaysPriorDate = fiveDaysPrior.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+  const url = `${CME_PREDICTION_API}?CMEtimeStart=${fiveDaysPriorDate}&CMEtimeEnd=${currentDate}&skipNoArrivalObservedCMEs=false&closeOutCMEsOnly=false`;
+  console.log('Fetching CME predictions from URL:', url);
+
   try {
-    const today = new Date();
-    const thirtyDaysAgo = new Date(today);
-    thirtyDaysAgo.setDate(today.getDate() - 30);
-    
-    const start = startDate || thirtyDaysAgo.toISOString().split('T')[0];
-    const end = endDate || today.toISOString().split('T')[0];
-    
-    const response = await axios.get<CMEEvent[]>(`${NASA_DONKI_BASE}/CME`, {
-      params: {
-        startDate: start,
-        endDate: end,
-        api_key: NASA_API_KEY
-      },
-      timeout: 10000, // 10 second timeout
-      headers: {
-        'Accept': 'application/json',
+      const response = await fetch(url);
+      if (!response.ok) {
+          throw new Error(`Failed to fetch CME predictions: ${response.statusText}`);
       }
-    });
-    
-    return response.data;
+
+      const data = await response.json();
+
+
+      // Filter predictions to ensure the predicted arrival date is after the current date
+      const validPredictions = data
+      .flatMap((cme: any) => cme.predictions) // Extract all predictions from each CME object
+      .filter((prediction: any) => {
+        const predictedArrival = new Date(prediction.predictedArrivalTime);
+        console.log('Predicted Arrival Time:', predictedArrival);
+        return predictedArrival > new Date(); // Ensure the predicted arrival is in the future
+      });
+
+     console.log('Valid CME Predictions:', validPredictions);
+      return validPredictions;
+      
   } catch (error) {
-    console.error('Error fetching CME data:', error);
-    // Return empty array instead of throwing to prevent app crashes
-    if (axios.isAxiosError(error)) {
-      if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
-        console.warn('CME API network error - returning empty data');
-        return [];
-      }
-    }
-    throw error;
+      console.error('Error fetching CME predictions:', error);
+      return null;
   }
 }
 
-/**
- * Fetch CME Analysis (more detailed prediction data)
- */
-export async function fetchCMEAnalysis(startDate?: string, endDate?: string) {
-  try {
-    const today = new Date();
-    const thirtyDaysAgo = new Date(today);
-    thirtyDaysAgo.setDate(today.getDate() - 30);
-    
-    const start = startDate || thirtyDaysAgo.toISOString().split('T')[0];
-    const end = endDate || today.toISOString().split('T')[0];
-    
-    const response = await axios.get(`${NASA_DONKI_BASE}/CMEAnalysis`, {
-      params: {
-        startDate: start,
-        endDate: end,
-        mostAccurateOnly: true,
-        completeEntryOnly: true,
-        api_key: NASA_API_KEY
-      }
-    });
-    
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching CME analysis:', error);
-    throw error;
-  }
-}
 
 // ==================== SPACE WEATHER ====================
 
